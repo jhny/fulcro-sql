@@ -245,18 +245,18 @@
 (specification "Single-level query-for query generation"
   (assertions
     "Generates a base non-recursive SQL query that includes necessary join resolution columns"
-    (core/query-for test-schema nil [:db/id {:account/members [:db/id :member/name]}] (sorted-set 1 5 7 9)) => ["SELECT account.id AS \"account/id\" FROM account WHERE account.id IN (1,5,7,9)" nil]
-    (core/query-for test-schema :account/members [:db/id :member/name] (sorted-set 1 5)) => ["SELECT member.account_id AS \"member/account_id\",member.id AS \"member/id\",member.name AS \"member/name\" FROM member WHERE member.account_id IN (1,5)" nil]
-    (core/query-for test-schema :account/settings [:db/id :settings/auto-open?] (sorted-set 3)) => ["SELECT settings.auto_open AS \"settings/auto_open\",settings.id AS \"settings/id\" FROM settings WHERE settings.id IN (3)" nil]
-    (core/query-for test-schema nil [:db/id :boo/name :boo/bah] #{3}) => ["SELECT boo.bah AS \"boo/bah\",boo.id AS \"boo/id\",boo.name AS \"boo/name\" FROM boo WHERE boo.id IN (3)" nil]
+    (core/query-for test-schema nil [:db/id {:account/members [:db/id :member/name]}] (sorted-set 1 5 7 9)) => ["SELECT account.id AS \"account/id\" FROM account WHERE account.id IN (?,?,?,?)" [1 5 7 9]]
+    (core/query-for test-schema :account/members [:db/id :member/name] (sorted-set 1 5)) => ["SELECT member.account_id AS \"member/account_id\",member.id AS \"member/id\",member.name AS \"member/name\" FROM member WHERE member.account_id IN (?,?)" [1 5]]
+    (core/query-for test-schema :account/settings [:db/id :settings/auto-open?] (sorted-set 3)) => ["SELECT settings.auto_open AS \"settings/auto_open\",settings.id AS \"settings/id\" FROM settings WHERE settings.id IN (?)" [3]]
+    (core/query-for test-schema nil [:db/id :boo/name :boo/bah] #{3}) => ["SELECT boo.bah AS \"boo/bah\",boo.id AS \"boo/id\",boo.name AS \"boo/name\" FROM boo WHERE boo.id IN (?)" [3]]
     "Derives correct SQL table name if possible"
-    (core/query-for test-schema nil [:db/id {:account/members [:db/id :member/name]}] (sorted-set 1 5 7 9)) => ["SELECT account.id AS \"account/id\" FROM account WHERE account.id IN (1,5,7,9)" nil]
+    (core/query-for test-schema nil [:db/id {:account/members [:db/id :member/name]}] (sorted-set 1 5 7 9)) => ["SELECT account.id AS \"account/id\" FROM account WHERE account.id IN (?,?,?,?)" [1 5 7 9]]
     (core/query-for test-schema nil [:db/id] (sorted-set 1 5 7 9)) =throws=> (AssertionError #"Could not determine")
     "Supports adding additional filter criteria"
     (core/query-for test-schema nil [:db/id {:account/members [:db/id :member/name]}] (sorted-set 1 5 7 9) {:account [(core/filter-where "account.deleted = ?" [false])]})
-    => ["SELECT account.id AS \"account/id\" FROM account WHERE (account.deleted = ?) AND account.id IN (1,5,7,9)" [false]]
+    => ["SELECT account.id AS \"account/id\" FROM account WHERE (account.deleted = ?) AND account.id IN (?,?,?,?)" [false 1 5 7 9]]
     (core/query-for test-schema nil [:db/id {:account/members [:db/id :member/name]}] (sorted-set 1 5 7 9) {:account [(core/filter-where "account.deleted = ? AND account.age > ?" [false 22])]})
-    => ["SELECT account.id AS \"account/id\" FROM account WHERE (account.deleted = ? AND account.age > ?) AND account.id IN (1,5,7,9)" [false, 22]]))
+    => ["SELECT account.id AS \"account/id\" FROM account WHERE (account.deleted = ? AND account.age > ?) AND account.id IN (?,?,?,?)" [false, 22 1 5 7 9]]))
 
 (specification "Run-query internals"
   (assertions "Returns nil if there are no IDs in the root set"

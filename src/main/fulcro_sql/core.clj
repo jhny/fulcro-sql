@@ -481,8 +481,8 @@
    (assert (set? id-set) "id-set is a set")
    (let [table                (table-for schema graph-query)
          join-cols-to-include (->> graph-query
-                                (filter map?)
-                                (keep (partial sqlprop-for-join schema)))
+                                   (filter map?)
+                                   (keep (partial sqlprop-for-join schema)))
          join-path            (get joins graph-join-prop)
          sql-join-column      (second join-path)
          columns              (apply sorted-set (concat (columns-for schema graph-query) join-cols-to-include))
@@ -490,12 +490,9 @@
          column-selectors     (map #(column-spec schema %) columns)
          selectors            (str/join "," column-selectors)
          table-name           (name table)
-         ids                  (str/join "," (map str (keep identity id-set)))
          has-join-table?      (> (count join-path) 2)
-         id-col               (if sql-join-column
-                                (str-col sql-join-column)
-                                (str-idcol schema table))
-         [general-filter params] (row-filter schema filtering #{table})]
+         id-params            (keep identity id-set)
+         ids                  (str/join "," (take (count id-params) (repeat "?")))]
      (if has-join-table?
        (let [left-table  (-> join-path second namespace)
              right-table (-> join-path last namespace)
@@ -504,9 +501,14 @@
              filter-col  (-> join-path second str-col)
              [general-filter params] (row-filter schema filtering #{(keyword left-table) (keyword right-table)})
              from-clause (str "FROM " left-table " INNER JOIN " right-table " ON " col-left " = " col-right)
-             ids         (str/join "," id-set)]
+             params      (concat params id-params)]
          [(str "SELECT " selectors " " from-clause " WHERE " (when general-filter (str general-filter " AND ")) filter-col " IN (" ids ")") params])
-       [(str "SELECT " selectors " FROM " table-name " WHERE " (when general-filter (str general-filter " AND ")) id-col " IN (" ids ")") params]))))
+       (let [[general-filter params] (row-filter schema filtering #{table})
+             params (concat params id-params)
+             id-col (if sql-join-column
+                      (str-col (graphprop->sqlprop* schema sql-join-column))
+                      (str-idcol schema table))]
+         [(str "SELECT " selectors " FROM " table-name " WHERE " (when general-filter (str general-filter " AND ")) id-col " IN (" ids ")") params])))))
 
 (defn to-one [join-seq]
   (assert (and (vector? join-seq) (every? keyword? join-seq)) "join sequence is a vector of keywords")
